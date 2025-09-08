@@ -1,40 +1,33 @@
 // pages/api/search.js
 import OpenAI from "openai";
 
-// Allow both your Squarespace site and your API domain
-const ALLOWED_ORIGINS = new Set([
-  "https://www.vorrasi.com",
-  "https://vorrasi.com",
-  "https://api.thisplaceisjustlikethatplace.com"
-]);
-
-function applyCors(req, res) {
-  const origin = req.headers.origin;
-  const allowed = origin && ALLOWED_ORIGINS.has(origin) ? origin : "*";
-
-  res.setHeader("Access-Control-Allow-Origin", allowed);
-  res.setHeader("Vary", "Origin");
+// Simple, permissive CORS for public API
+function setCORS(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Max-Age", "86400");
 }
 
 export default async function handler(req, res) {
-  applyCors(req, res);
+  setCORS(res);
 
+  // Preflight
   if (req.method === "OPTIONS") {
-    res.status(204).end();
+    res.status(200).end();
     return;
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({ ok: false, error: "method_not_allowed" });
+    res.status(405).json({ ok: false, error: "method_not_allowed" });
+    return;
   }
 
   try {
     const { from, region, debug } = req.body || {};
     if (!from || !region) {
-      return res.status(400).json({ ok: false, error: "missing_from_or_region" });
+      res.status(400).json({ ok: false, error: "missing_from_or_region" });
+      return;
     }
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -58,10 +51,11 @@ You are This Is Just Like That — return neighborhoods/cities **in the destinat
     const json = JSON.parse(text);
 
     if (!json?.matches) {
-      return res.status(502).json({ ok: false, error: "bad_ai_response", raw: debug ? text : undefined });
+      res.status(502).json({ ok: false, error: "bad_ai_response", raw: debug ? text : undefined });
+      return;
     }
 
-    return res.status(200).json({
+    res.status(200).json({
       ok: true,
       from,
       region,
@@ -70,6 +64,6 @@ You are This Is Just Like That — return neighborhoods/cities **in the destinat
     });
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ ok: false, error: "server_error" });
+    res.status(500).json({ ok: false, error: "server_error" });
   }
 }
