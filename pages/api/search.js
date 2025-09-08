@@ -1,18 +1,16 @@
 // pages/api/search.js
 import OpenAI from "openai";
 
-// Simple, permissive CORS for public API
 function setCORS(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.setHeader("Access-Control-Max-Age", "86400");
 }
 
 export default async function handler(req, res) {
   setCORS(res);
 
-  // Preflight
+  // Always handle preflight with 200 + headers
   if (req.method === "OPTIONS") {
     res.status(200).end();
     return;
