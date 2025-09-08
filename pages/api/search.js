@@ -1,15 +1,32 @@
 // pages/api/search.js
 import OpenAI from "openai";
 
-function cors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+// Allow both your Squarespace site and your API domain
+const ALLOWED_ORIGINS = new Set([
+  "https://www.vorrasi.com",
+  "https://vorrasi.com",
+  "https://api.thisplaceisjustlikethatplace.com"
+]);
+
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  const allowed = origin && ALLOWED_ORIGINS.has(origin) ? origin : "*";
+
+  res.setHeader("Access-Control-Allow-Origin", allowed);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Max-Age", "86400");
 }
 
 export default async function handler(req, res) {
-  cors(res);
-  if (req.method === "OPTIONS") return res.status(200).end();
+  applyCors(req, res);
+
+  if (req.method === "OPTIONS") {
+    res.status(204).end();
+    return;
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "method_not_allowed" });
   }
@@ -21,6 +38,7 @@ export default async function handler(req, res) {
     }
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
     const prompt = `
 You are This Is Just Like That — return neighborhoods/cities **in the destination region** that feel like the source place.
 - Source place: "${from}"
@@ -40,7 +58,7 @@ You are This Is Just Like That — return neighborhoods/cities **in the destinat
     const json = JSON.parse(text);
 
     if (!json?.matches) {
-      return res.status(500).json({ ok: false, error: "bad_ai_response", raw: debug ? text : undefined });
+      return res.status(502).json({ ok: false, error: "bad_ai_response", raw: debug ? text : undefined });
     }
 
     return res.status(200).json({
@@ -48,7 +66,7 @@ You are This Is Just Like That — return neighborhoods/cities **in the destinat
       from,
       region,
       matches: json.matches.slice(0, 3),
-      ...(debug ? { debug: { tokenUsage: resp.usage } } : {})
+      ...(debug ? { debug: { usage: resp.usage } } : {})
     });
   } catch (e) {
     console.error(e);
