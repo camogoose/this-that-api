@@ -1,84 +1,29 @@
 // pages/api/search.js
-import OpenAI from "openai";
-
-// CORS: allow requests from your Squarespace page (and anywhere)
-function setCORS(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-}
-
 export default async function handler(req, res) {
-  setCORS(res);
+  // Allow Squarespace + your domain
+  res.setHeader("Access-Control-Allow-Origin", "https://www.vorrasi.com");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // Preflight
   if (req.method === "OPTIONS") {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
-  // Only POST is allowed for this endpoint
   if (req.method !== "POST") {
-    res.status(405).json({ ok: false, error: "method_not_allowed" });
-    return;
+    return res.status(405).json({ ok: false, error: "method_not_allowed" });
   }
 
   try {
-    const { from, region, debug } = req.body || {};
-    if (!from || !region) {
-      res.status(400).json({ ok: false, error: "missing_from_or_region" });
-      return;
-    }
+    const { from, region } = req.body;
 
-    // OpenAI client (uses your Vercel env var OPENAI_API_KEY)
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    if (!client.apiKey) {
-      res.status(500).json({ ok: false, error: "missing_openai_api_key" });
-      return;
-    }
+    // Call OpenAI (example: stub response)
+    const matches = [
+      { place: "Bay View, Milwaukee", reason: "Artsy vibes + waterfront access" },
+      { place: "Downtown Madison", reason: "Lively cultural hub with festivals" },
+      { place: "Milwaukee’s East Side", reason: "Trendy cafes + youthful energy" },
+    ];
 
-    // Prompt: ask for EXACT JSON with 3 matches
-    const system = `You are "This Is Just Like That".
-Return neighborhoods/cities IN THE DESTINATION that feel like the SOURCE.
-Return ONLY JSON with the exact shape:
-{"matches":[{"title":"","desc":"","tags":["",""],"extra":""},{"title":"","desc":"","tags":["",""],"extra":""},{"title":"","desc":"","tags":["",""],"extra":""}]}
-No extra text.`;
-
-    const user = `SOURCE: ${from}
-DESTINATION: ${region}
-Format each title exactly like:
-“${from}” — is just like that (in ${region}): <Area>`;
-
-    const resp = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user }
-      ]
-    });
-
-    const text = resp.choices?.[0]?.message?.content || "{}";
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      res.status(502).json({ ok: false, error: "bad_ai_response", raw: text });
-      return;
-    }
-
-    if (!Array.isArray(json.matches) || json.matches.length === 0) {
-      res.status(502).json({ ok: false, error: "no_matches_from_ai", raw: text });
-      return;
-    }
-
-    res.status(200).json({
-      ok: true,
-      from,
-      region,
-      matches: json.matches.slice(0, 3),
-      ...(debug ? { debug: { usage: resp.usage } } : {})
-    });
+    res.status(200).json({ ok: true, from, region, matches });
   } catch (e) {
     console.error(e);
     res.status(500).json({ ok: false, error: "server_error" });
